@@ -19,7 +19,7 @@ const String GITHUB_BIN_URL = "https://github.com/foxysprolt/weather_unip_cc2a13
 
 // --- CREDENCIAIS ---
 const char* WIFI_SSID = "Ester 2.4G";
-const char* WIFI_PASS = "Ester 3600";
+const char* WIFI_PASS = "Ester3600";
 
 const char* CHANNEL_ID = "3465259";
 const char* WRITE_API_KEY = "OGC5WGBQU4OU3GJA";
