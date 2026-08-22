@@ -102,7 +102,7 @@ async function carregarDadosSensores() {
     document.getElementById('dash-umid').innerText = Math.round(feed.field2);
     
     // Lê a versão atual enviada pelo ESP32 no field3
-    versaoAtualESP = feed.field3 ? feed.field3 : "v1.0.0";
+    versaoAtualESP = feed.field5 ? feed.field5 : "v1.0.0"; // Lê do field5!
     document.getElementById('esp-version').innerText = versaoAtualESP;
 
     const d = new Date(feed.created_at);

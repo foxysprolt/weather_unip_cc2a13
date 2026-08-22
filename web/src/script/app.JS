@@ -64,3 +64,11 @@ async function carregarDadosClima() {
 
 setInterval(carregarDadosClima, 15000);
 carregarDadosClima();
+
+async function abrirPainelOTA() {
+  if (confirm("Deseja disparar a atualização remota do ESP32 via GitHub Release?")) {
+    const urlGatilho = `https://api.thingspeak.com/update?api_key=OGC5WGBQU4OU3GJA&field4=1`;
+    await fetch(urlGatilho);
+    alert("Comando de atualização enviado! Em até 15 segundos o ESP32 baixará a nova Release.");
+  }
+}

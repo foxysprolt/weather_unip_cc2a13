@@ -17,6 +17,44 @@ body {
     color: #ffffff;
     padding: 20px;
 }
+/* ALINHAMENTO DO HEADER */
+.header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 5px;
+}
+
+/* BOTÃO ADMIN / OTA */
+.btn-admin {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-admin:hover {
+  background: #00a8ff;
+  border-color: #00a8ff;
+  box-shadow: 0 0 10px rgba(0, 168, 255, 0.5);
+}
+
+/* AJUSTE PARA O MODO CLARO */
+.weather-widget.light-mode .btn-admin {
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  color: #0f172a;
+}
+
+.weather-widget.light-mode .btn-admin:hover {
+  background: #00a8ff;
+  color: #ffffff;
+}
 
 /* CONTAINER ESTILO WIDGET APP IOS */
 .weather-widget {

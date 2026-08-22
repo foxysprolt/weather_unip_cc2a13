@@ -12,14 +12,17 @@
   <div class="weather-widget" id="main-widget">
     <!-- HEADER DO WIDGET -->
     <div class="widget-header">
-      <span class="data-atual" id="dash-data">CARREGANDO DATA...</span>
+      <div class="header-top">
+        <span class="data-atual" id="dash-data">CARREGANDO DATA...</span>
+        <!-- BOTÃO DE LOGIN / ADMIN OTA -->
+        <button class="btn-admin" onclick="abrirPainelOTA()" title="Acessar Painel Admin">⚙️ Admin</button>
+      </div>
+      
       <div class="temp-principal">
         <span id="dash-temp">--</span>°C
       </div>
       <p class="frase-clima" id="dash-temp-msg">Analisando atmosfera...</p>
     </div>
-
-    
 
     <!-- NAVEGAÇÃO POR ABAS (TABS) -->
     <div class="tabs-navigation">
@@ -87,6 +90,13 @@
       const abaAlvo = document.getElementById('pane-' + nomeAba);
       if (abaAlvo) abaAlvo.classList.add('active');
       if (elemento) elemento.classList.add('active');
+    }
+
+    // Função que redireciona para a tela de login OTA do ESP32
+    function abrirPainelOTA() {
+      // Altere '192.168.1.150' para o IP real do seu ESP32
+      const ipESP32 = "http://192.168.1.150:8080/update"; 
+      window.open(ipESP32, '_blank');
     }
   </script>
 
