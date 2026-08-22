@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cockpit IoT - Controle ESP32</title>
+  <link rel="stylesheet" href="../styles/cockpit.css">
+</head>
+<body>
+
+  <!-- TELA DE LOGIN -->
+  <div id="login-screen" class="card-login">
+    <h2>COCKPIT IoT</h2>
+    <p>Acesso Restrito ao Sistema</p>
+    <div class="input-group">
+      <input type="text" id="login-user" placeholder="Usuário (admin)">
+    </div>
+    <div class="input-group">
+      <input type="password" id="login-pass" placeholder="Senha (admin)">
+    </div>
+    <button onclick="autenticar()">Entrar no Painel</button>
+    <p id="login-error" class="error-msg"></p>
+  </div>
+
+  <!-- DASHBOARD / COCKPIT -->
+  <div id="dashboard" class="dashboard-container" style="display: none;">
+    <header class="top-bar">
+      <h1>⚡ COCKPIT WEATHER INTELLIGENCE</h1>
+      <button class="btn-logout" onclick="logout()">Sair</button>
+    </header>
+
+    <div class="grid-cockpit">
+      <!-- Card Status -->
+      <div class="card">
+        <h3>CONECTIVIDADE</h3>
+        <span class="badge online">● ONLINE</span>
+        <p>Dispositivo: <strong>ESP32-Weather</strong></p>
+        <p>Última leitura: <span id="dash-data">--:--</span></p>
+      </div>
+
+      <!-- Card Sensores -->
+      <div class="card">
+        <h3>SENSORES</h3>
+        <p>Temperatura: <strong id="dash-temp">--</strong> °C</p>
+        <p>Umidade: <strong id="dash-umid">--</strong> %</p>
+      </div>
+
+      <!-- Card Firmware GitHub -->
+      <div class="card card-ota">
+        <h3>GERENCIADOR DE FIRMWARE (GITHUB)</h3>
+        <p>Versão no ESP32: <strong id="esp-version" style="color: #38bdf8;">Lendo...</strong></p>
+        <p>Status: <strong id="firmware-status">Buscando atualizações no Git...</strong></p>
+        <button id="btn-ota" class="btn-update" onclick="dispararAtualizacao()" disabled>
+          Buscando Versão...
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../script/cockpit.js"></script>
+</body>
+</html>

@@ -1,127 +1,118 @@
 #include <Arduino.h>
 #include <WiFi.h>
-#include "ThingSpeak.h"
+#include <HTTPClient.h>
+#include <HTTPUpdate.h>
 #include <DHT.h>
-#include <Wire.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
 
-// --- DISPLAY OLED ---
-#define SCREEN_WIDTH 128
-#define SCREEN_HEIGHT 64
-#define OLED_RESET -1
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+// --- CONFIGURAÇÃO DA VERSÃO DO FIRMWARE ---
+const String FIRMWARE_VERSION = "v1.2.1"; // Incremente aqui a cada nova versão (ex: v1.0.1)
+const String GITHUB_BIN_URL = "https://github.com/seu-usuario/seu-repositorio/releases/latest/download/firmware.bin";
 
-// --- CONFIGURAÇÕES DE REDE ---
+// --- CREDENCIAIS DE REDE E THINGSPEAK ---
 const char* WIFI_SSID = "Ester 2.4G";
-const char* WIFI_PASS = "Ester3600";
+const char* WIFI_PASS = "Ester 3600";
 
-// --- CONFIGURAÇÕES THINGSPEAK ---
-unsigned long CHANNEL_ID = 3465259;
+const char* CHANNEL_ID = "3465259";
 const char* WRITE_API_KEY = "OGC5WGBQU4OU3GJA";
+const char* READ_API_KEY = "E6VGVV45AMAC0205";
 
-// --- PINOS ---
-#define DHTPIN 4       // DHT11
+#define DHTPIN 4
 #define DHTTYPE DHT11
-#define LDR_PIN 15     // Pino DO do módulo LDR
-
 DHT dht(DHTPIN, DHTTYPE);
-WiFiClient client;
 
-// Variáveis Globais
-float temp = 0;
-float umid = 0;
-int luz = 0;
-unsigned long ultimoEnvioThingSpeak = 0;
-unsigned long ultimaTrocaTela = 0;
-int telaAtual = 0;
+unsigned long lastTime = 0;
+const unsigned long timerDelay = 15000; // 15 segundos
 
-void desenharHeader(const char* titulo) {
-  display.clearDisplay();
-  display.drawRect(0, 0, 128, 64, SSD1306_WHITE);
-  display.fillRect(0, 0, 128, 14, SSD1306_WHITE);
-  display.setTextColor(SSD1306_BLACK);
-  display.setTextSize(1);
-  display.setCursor(8, 3);
-  display.println(titulo);
-  display.setTextColor(SSD1306_WHITE);
+void executarOTA() {
+  Serial.println("🚀 [OTA] Comando de atualização recebido via ThingSpeak!");
+  Serial.println("🌐 [OTA] Baixando firmware do GitHub...");
+
+  WiFiClientSecure client;
+  client.setInsecure(); // Ignora validação SSL estática do GitHub
+
+  t_httpUpdate_return ret = httpUpdate.update(client, GITHUB_BIN_URL);
+
+  switch (ret) {
+    case HTTP_UPDATE_FAILED:
+      Serial.printf("❌ [OTA] Falha: (%d): %s\n", httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
+      break;
+    case HTTP_UPDATE_NO_UPDATES:
+      Serial.println("⚠️ [OTA] Nenhuma atualização pendente no servidor.");
+      break;
+    case HTTP_UPDATE_OK:
+      Serial.println("✅ [OTA] Firmware atualizado com sucesso! Reiniciando...");
+      ESP.restart();
+      break;
+  }
 }
 
-void atualizarOLED() {
-  if (millis() - ultimaTrocaTela > 3000) {
-    telaAtual = (telaAtual + 1) % 3;
-    ultimaTrocaTela = millis();
+void checarComandoOTA() {
+  HTTPClient http;
+  String url = "https://api.thingspeak.com/channels/" + String(CHANNEL_ID) + "/fields/4/last.json?api_key=" + String(READ_API_KEY);
+  
+  http.begin(url);
+  int httpCode = http.GET();
+
+  if (httpCode == 200) {
+    String payload = http.getString();
+    if (payload.indexOf("\"field4\":\"1\"") != -1) {
+      // Reseta a flag field4 para 0 no ThingSpeak antes de atualizar
+      HTTPClient resetHttp;
+      String resetUrl = "https://api.thingspeak.com/update?api_key=" + String(WRITE_API_KEY) + "&field4=0";
+      resetHttp.begin(resetUrl);
+      resetHttp.GET();
+      resetHttp.end();
+
+      executarOTA();
+    }
+  }
+  http.end();
+}
+
+void enviarDadosECheck() {
+  float h = dht.readHumidity();
+  float t = dht.readTemperature();
+
+  if (isnan(h) || isnan(t)) {
+    Serial.println("Falha ao ler o sensor DHT!");
+    return;
   }
 
-  switch (telaAtual) {
-    case 0:
-      desenharHeader("TEMPERATURA (DHT11)");
-      display.setTextSize(3);
-      display.setCursor(12, 22);
-      display.print(temp, 1);
-      display.setTextSize(1);
-      display.print(" C");
-      break;
+  HTTPClient http;
+  String url = "https://api.thingspeak.com/update?api_key=" + String(WRITE_API_KEY);
+  url += "&field1=" + String(t);
+  url += "&field2=" + String(h);
+  url += "&field3=" + FIRMWARE_VERSION; // Transmite a versão gravada no chip!
 
-    case 1:
-      desenharHeader("UMIDADE DO AR");
-      display.setTextSize(3);
-      display.setCursor(22, 22);
-      display.print((int)umid);
-      display.print(" %");
-      break;
-
-    case 2:
-      desenharHeader("STATUS DE LUZ (LDR)");
-      display.setTextSize(2);
-      display.setCursor(18, 25);
-      if (luz > 2000) display.print("DIA ☀️");
-      else display.print("NOITE 🌙");
-      break;
+  http.begin(url);
+  int httpCode = http.GET();
+  if (httpCode == 200) {
+    Serial.printf(" [Data] Temp: %.1f °C | Umid: %.0f %% | Versão: %s\n", t, h, FIRMWARE_VERSION.c_str());
   }
-  display.display();
+  http.end();
+
+  // Verifica se o dashboard acionou o Field 4
+  checarComandoOTA();
 }
 
 void setup() {
   Serial.begin(115200);
-  pinMode(LDR_PIN, INPUT);
-
-  Wire.begin(21, 22);
-  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
-    for (;;);
-  }
-
   dht.begin();
+
   WiFi.begin(WIFI_SSID, WIFI_PASS);
+  Serial.print("Conectando ao Wi-Fi");
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
+    Serial.print(".");
   }
-
-  ThingSpeak.begin(client);
+  Serial.println("\nWi-Fi Conectado!");
 }
 
 void loop() {
-  float t = dht.readTemperature();
-  float u = dht.readHumidity();
-
-  if (!isnan(t) && !isnan(u)) {
-    temp = t;
-    umid = u;
-  }
-
-  // --- LEITURA DO LDR DE FÁBRICA (INVERTIDA) ---
-  // LOW (0) = Bateu Luz no Módulo -> Envia 4095 (Ativa Modo Claro na Web)
-  // HIGH (1) = Escuro -> Envia 0 (Ativa Modo Escuro na Web)
-  int leituraDigital = digitalRead(LDR_PIN);
-  luz = (leituraDigital == LOW) ? 4095 : 0;
-
-  atualizarOLED();
-
-  if (millis() - ultimoEnvioThingSpeak > 15000) {
-    ThingSpeak.setField(1, temp);
-    ThingSpeak.setField(2, umid);
-    ThingSpeak.setField(3, luz);
-    ThingSpeak.writeFields(CHANNEL_ID, WRITE_API_KEY);
-    ultimoEnvioThingSpeak = millis();
+  if ((millis() - lastTime) > timerDelay) {
+    if (WiFi.status() == WL_CONNECTED) {
+      enviarDadosECheck();
+    }
+    lastTime = millis();
   }
 }
