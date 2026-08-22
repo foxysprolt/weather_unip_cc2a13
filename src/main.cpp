@@ -13,13 +13,13 @@
 #define OLED_RESET -1
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
-// --- VERSÃO DO FIRMWARE ---
-const String FIRMWARE_VERSION = "v1.2.6"; 
+// --- CONFIGURAÇÃO DA VERSÃO DO FIRMWARE ---
+const String FIRMWARE_VERSION = "v1.2.1"; 
 const String GITHUB_BIN_URL = "https://github.com/foxysprolt/weather_unip_cc2a13/releases/latest/download/firmware.bin";
 
-// --- CREDENCIAIS ---
+// --- CREDENCIAIS DE REDE E THINGSPEAK ---
 const char* WIFI_SSID = "Ester 2.4G";
-const char* WIFI_PASS = "Ester3600";
+const char* WIFI_PASS = "Ester 3600";
 
 const char* CHANNEL_ID = "3465259";
 const char* WRITE_API_KEY = "OGC5WGBQU4OU3GJA";
@@ -127,7 +127,6 @@ void checarComandoOTA() {
   if (httpCode == 200) {
     String payload = http.getString();
     if (payload.indexOf("\"field4\":\"1\"") != -1) {
-      // Reseta a flag field4 para 0 no ThingSpeak
       HTTPClient resetHttp;
       String resetUrl = "https://api.thingspeak.com/update?api_key=" + String(WRITE_API_KEY) + "&field4=0";
       resetHttp.begin(resetUrl);
@@ -160,7 +159,7 @@ void enviarDadosECheck() {
   url += "&field1=" + String(t);
   url += "&field2=" + String(h);
   url += "&field3=" + String(luzG);             // Field 3: LDR
-  url += "&field5=" + FIRMWARE_VERSION;         // Field 5: Versão para o Cockpit
+  url += "&field5=" + FIRMWARE_VERSION;         // Field 5: Versão Firmware
 
   http.begin(url);
   int httpCode = http.GET();
@@ -176,9 +175,23 @@ void setup() {
   Serial.begin(115200);
   pinMode(LDR_PIN, INPUT);
 
+  // Reinicializa o barramento I2C e força reinício no endereço 0x3C
+  Wire.end();
   Wire.begin(21, 22);
-  if (display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+  
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    Serial.println("❌ Erro ao inicializar OLED no 0x3C, tentando 0x3D...");
+    if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3D)) {
+      Serial.println("❌ Falha crítica no OLED!");
+    }
+  } else {
+    Serial.println("✅ OLED Inicializado com Sucesso!");
     display.clearDisplay();
+    display.setTextColor(SSD1306_WHITE);
+    display.setTextSize(1);
+    display.setCursor(10, 20);
+    display.println("Conectando Wi-Fi...");
+    display.display();
   }
 
   dht.begin();
