@@ -31,42 +31,97 @@
   </div>
 
   <script>
-    // Dados simulados que depois serão preenchidos pela sua API Adafruit IO / ESP32
-    const dadosSensores = {
-      umidade: {
-        nome: "Umidade Relativa (DHT11)",
-        valor: "62 %",
-        status: "Nível ideal",
-        corStatus: "#4ade80"
-      },
-      gas: {
-        nome: "Detector de Gás (MQ-2)",
-        valor: "120 PPM",
-        status: "Ar Seguro / Sem Vazamento",
-        corStatus: "#4ade80"
-      },
-      pressao: {
-        nome: "Pressão Atmosférica (BMP280)",
-        valor: "1013 hPa",
-        status: "Estável (Nível do Mar)",
-        corStatus: "#38bdf8"
-      }
-    };
-
-    function mostrarSensor(tipo, botao) {
-      // Remove a classe 'active' de todos os botões e adiciona no clicado
-      document.querySelectorAll('.btn-sensor').forEach(b => b.classList.remove('active'));
-      botao.classList.add('active');
-
-      // Atualiza os dados no painel inferior
-      const sensor = dadosSensores[tipo];
-      document.getElementById('sensor-nome').innerText = sensor.nome;
-      document.getElementById('sensor-valor').innerText = sensor.valor;
-
-      const elemStatus = document.getElementById('sensor-status');
-      elemStatus.innerText = sensor.status;
-      elemStatus.style.color = sensor.corStatus;
+  // Objeto para armazenar as leituras reais da API
+  const dadosSensores = {
+    umidade: {
+      nome: "Umidade Relativa (DHT11)",
+      valor: "-- %",
+      status: "Carregando...",
+      corStatus: "#9ca3af"
+    },
+    gas: {
+      nome: "Detector de Gás (MQ-2)",
+      valor: "120 PPM", // Valor estático enquanto não adicionar no field3 da API
+      status: "Ar Seguro / Sem Vazamento",
+      corStatus: "#4ade80"
+    },
+    pressao: {
+      nome: "Pressão Atmosférica (BMP280)",
+      valor: "1013 hPa", // Valor estático enquanto não adicionar no field4 da API
+      status: "Estável (Nível do Mar)",
+      corStatus: "#38bdf8"
     }
-  </script>
+  };
+
+  let sensorAtual = 'umidade';
+
+  // Função para buscar dados reais do ThingSpeak
+  async function buscarDadosAPI() {
+    const url = "https://api.thingspeak.com/channels/3465259/feeds.json?api_key=E6VGVV45AMAC0205&results=1";
+
+    try {
+      const resposta = await fetch(url);
+      const json = await resposta.json();
+      
+      if (json.feeds && json.feeds.length > 0) {
+        const ultimaLeitura = json.feeds[0];
+        
+        // Converte os valores recebidos da API
+        const temp = parseFloat(ultimaLeitura.field1).toFixed(1);
+        const umid = parseFloat(ultimaLeitura.field2).toFixed(0);
+
+        // Atualiza a Temperatura Principal
+        if (!isNaN(temp)) {
+          document.getElementById('temp-val').innerText = temp;
+        }
+
+        // Atualiza a Umidade no objeto de sensores
+        if (!isNaN(umid)) {
+          dadosSensores.umidade.valor = umid + " %";
+          
+          if (umid < 30) {
+            dadosSensores.umidade.status = "Ar Seco";
+            dadosSensores.umidade.corStatus = "#f87171";
+          } else if (umid <= 70) {
+            dadosSensores.umidade.status = "Nível Ideal";
+            dadosSensores.umidade.corStatus = "#4ade80";
+          } else {
+            dadosSensores.umidade.status = "Umidade Elevada";
+            dadosSensores.umidade.corStatus = "#38bdf8";
+          }
+        }
+
+        // Atualiza a tela com o sensor selecionado no momento
+        atualizarPainelDetalhes();
+      }
+    } catch (erro) {
+      console.error("Erro ao carregar dados do ThingSpeak:", erro);
+    }
+  }
+
+  function mostrarSensor(tipo, botao) {
+    document.querySelectorAll('.btn-sensor').forEach(b => b.classList.remove('active'));
+    botao.classList.add('active');
+
+    sensorAtual = tipo;
+    atualizarPainelDetalhes();
+  }
+
+  function atualizarPainelDetalhes() {
+    const sensor = dadosSensores[sensorAtual];
+    document.getElementById('sensor-nome').innerText = sensor.nome;
+    document.getElementById('sensor-valor').innerText = sensor.valor;
+
+    const elemStatus = document.getElementById('sensor-status');
+    elemStatus.innerText = sensor.status;
+    elemStatus.style.color = sensor.corStatus;
+  }
+
+  // Executa ao carregar a página
+  buscarDadosAPI();
+
+  // Atualiza automaticamente os dados a cada 15 segundos
+  setInterval(buscarDadosAPI, 15000);
+</script>
 </body>
 </html>
