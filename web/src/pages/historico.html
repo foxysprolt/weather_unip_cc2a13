@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Replay Histórico - Weather Intelligence</title>
+  <link rel="stylesheet" href="../styles/styles.css">
+  <link rel="icon" type="image/png" href="../img/log.png">
+</head>
+<body>
+
+  <div class="weather-widget">
+    <!-- HEADER DO WIDGET -->
+    <div class="widget-header">
+      <span class="data-atual" id="dash-data">REPLAY HISTÓRICO DA TEMPERATURA</span>
+      <div class="temp-principal">
+        <span id="dash-temp">--</span>°C
+      </div>
+      <p class="frase-clima" id="dash-temp-msg">Navegue na linha do tempo...</p>
+    </div>
+
+    <!-- NAVEGAÇÃO POR ABAS (TABS) -->
+    <div class="tabs-navigation">
+      <button class="tab-btn active" onclick="trocarAba('umidade', this)">Umidade</button>
+      <button class="tab-btn" onclick="trocarAba('gas', this)">Gás/Fumaça</button>
+      <button class="tab-btn" onclick="trocarAba('pressao', this)">Pressão</button>
+    </div>
+
+    <!-- CONTEÚDO DINÂMICO DAS ABAS -->
+    <div class="tab-content-wrapper">
+      
+      <!-- ABA 1: UMIDADE -->
+      <div class="tab-pane active" id="pane-umidade">
+        <span class="sensor-tag">UMIDADE RELATIVA (DHT11)</span>
+        <div class="card-interior umid-interior">
+          <div class="nivel-agua" id="nivel-agua">
+            <svg class="onda" viewBox="0 0 1200 60" preserveAspectRatio="none">
+              <path d="M0,30 C150,60 300,0 600,30 C900,60 1050,0 1200,30 L1200,60 L0,60 Z" fill="#48dbfb" opacity="0.9"></path>
+            </svg>
+            <svg class="onda onda2" viewBox="0 0 1200 60" preserveAspectRatio="none">
+              <path d="M0,30 C150,60 300,0 600,30 C900,60 1050,0 1200,30 L1200,60 L0,60 Z" fill="#9be8fd"></path>
+            </svg>
+          </div>
+          <div class="valor-pane"><span id="dash-umid">--</span> %</div>
+        </div>
+        <p class="status-sub" id="dash-umid-msg">Nível ideal registrado</p>
+      </div>
+
+      <!-- ABA 2: GÁS / FUMAÇA -->
+      <div class="tab-pane" id="pane-gas">
+        <span class="sensor-tag">QUALIDADE DO AR (MQ-2)</span>
+        <div class="card-interior gas-interior" id="card-gas">
+          <div class="valor-pane"><span id="dash-gas">--</span> PPM</div>
+        </div>
+        <p class="status-sub" id="dash-gas-msg">Leitura do período</p>
+      </div>
+
+      <!-- ABA 3: PRESSÃO -->
+      <div class="tab-pane" id="pane-pressao">
+        <span class="sensor-tag">PRESSÃO ATMOSFÉRICA (BMP280)</span>
+        <div class="card-interior pressao-interior">
+          <div class="bexiga-wrapper">
+            <div class="bexiga" id="dash-bexiga">
+              <div class="no-bexiga"></div>
+            </div>
+          </div>
+          <div class="valor-pane"><span id="dash-pressao">--</span> hPa</div>
+        </div>
+        <p class="status-sub">Nível Barométrico Registrado</p>
+      </div>
+
+    </div>
+
+    <!-- LINHA DO TEMPO ESTILO PLAYER -->
+    <div class="player-container">
+      <div class="time-display">Horário Registrado: <span id="hora-selecionada">12:00</span></div>
+      <div class="player-controls">
+        <button id="btn-play" onclick="alternarPlay()">▶ Play</button>
+        <input type="range" id="timeline" min="0" max="23" value="12" oninput="atualizarPorTimeline(this.value)">
+      </div>
+    </div>
+
+    <!-- RODAPÉ PARA VOLTAR -->
+    <div class="widget-footer">
+      <button class="btn-replay" onclick="window.location.href='index.html'">◀ Voltar ao Clima Ao Vivo</button>
+    </div>
+  </div>
+
+  <script src="../script/historico.js"></script>
+</body>
+</html>

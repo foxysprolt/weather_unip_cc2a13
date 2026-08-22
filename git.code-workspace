@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "../../../../git"
+		},
+		{
+			"name": "espunip",
+			"path": "."
+		}
+	],
+	"settings": {
+		"liveServer.settings.multiRootWorkspaceName": "espunip"
+	}
+}
