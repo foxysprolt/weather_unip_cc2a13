@@ -14,7 +14,7 @@
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 // --- CONFIGURAÇÃO DA VERSÃO DO FIRMWARE ---
-const String FIRMWARE_VERSION = "v1.3.7"; 
+const String FIRMWARE_VERSION = "v1.3.8"; 
 const String GITHUB_BIN_URL = "https://github.com/foxysprolt/weather_unip_cc2a13/releases/latest/download/firmware.bin";
 
 // --- CREDENCIAIS DE REDE E THINGSPEAK ---
@@ -143,7 +143,7 @@ void executarOTA() {
       display.setCursor(10, 30);
       display.print("Reiniciando...");
       display.display();
-      delay(250);
+      delay(1500);
       ESP.restart();
       break;
   }
