@@ -14,12 +14,12 @@
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 // --- CONFIGURAÇÃO DA VERSÃO DO FIRMWARE ---
-const String FIRMWARE_VERSION = "v1.2.1"; 
+const String FIRMWARE_VERSION = "v1.3.7"; 
 const String GITHUB_BIN_URL = "https://github.com/foxysprolt/weather_unip_cc2a13/releases/latest/download/firmware.bin";
 
 // --- CREDENCIAIS DE REDE E THINGSPEAK ---
 const char* WIFI_SSID = "Ester 2.4G";
-const char* WIFI_PASS = "Ester 3600";
+const char* WIFI_PASS = "Ester3600";
 
 const char* CHANNEL_ID = "3465259";
 const char* WRITE_API_KEY = "OGC5WGBQU4OU3GJA";
@@ -29,6 +29,7 @@ const char* READ_API_KEY = "E6VGVV45AMAC0205";
 #define DHTPIN 4
 #define DHTTYPE DHT11
 #define LDR_PIN 15
+#define GAS_PIN 2 // Sensor de Gás/Fumaça (ADC1 - Pino Analógico)
 
 DHT dht(DHTPIN, DHTTYPE);
 
@@ -40,6 +41,7 @@ int telaAtual = 0;
 float tempG = 0;
 float umidG = 0;
 int luzG = 0;
+int gasG = 0;
 
 void desenharHeader(const char* titulo) {
   display.clearDisplay();
@@ -54,7 +56,7 @@ void desenharHeader(const char* titulo) {
 
 void atualizarOLED() {
   if (millis() - ultimaTrocaTela > 3000) {
-    telaAtual = (telaAtual + 1) % 3;
+    telaAtual = (telaAtual + 1) % 4; // Alterna entre as 4 telas
     ultimaTrocaTela = millis();
   }
 
@@ -78,10 +80,17 @@ void atualizarOLED() {
 
     case 2:
       desenharHeader("LUMINOSIDADE (LDR)");
-      display.setTextSize(2);
+      display.setTextSize(3);
       display.setCursor(18, 25);
-      if (luzG > 2000) display.print("DIA ☀️");
-      else display.print("NOITE 🌙");
+      if (luzG > 2000) display.print("DIA");
+      else display.print("NOITE");
+      break;
+
+    case 3:
+      desenharHeader("GAS / FUMACA");
+      display.setTextSize(3);
+      display.setCursor(18, 25);
+      display.print(gasG);
       break;
   }
   display.display();
@@ -99,19 +108,42 @@ void executarOTA() {
   display.display();
 
   WiFiClientSecure client;
-  client.setInsecure(); 
+  client.setInsecure();  // Ignora SSL estático do GitHub
+  client.setTimeout(15); // Aumenta o tempo limite para downloads lentos
+
+  // Força seguir o redirecionamento 302 do GitHub/AWS
+  httpUpdate.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+  httpUpdate.rebootOnUpdate(false); // Desativa reboot automático para tratar no código
 
   t_httpUpdate_return ret = httpUpdate.update(client, GITHUB_BIN_URL);
 
   switch (ret) {
     case HTTP_UPDATE_FAILED:
       Serial.printf("❌ [OTA] Falha: (%d): %s\n", httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
+      display.clearDisplay();
+      desenharHeader("ERRO OTA");
+      display.setTextSize(1);
+      display.setCursor(5, 25);
+      display.print("Falha no download!");
+      display.setCursor(5, 40);
+      display.print(httpUpdate.getLastErrorString().c_str());
+      display.display();
+      delay(3000);
       break;
+
     case HTTP_UPDATE_NO_UPDATES:
       Serial.println("⚠️ [OTA] Nenhuma atualização pendente no servidor.");
       break;
+
     case HTTP_UPDATE_OK:
       Serial.println("✅ [OTA] Firmware atualizado com sucesso! Reiniciando...");
+      display.clearDisplay();
+      desenharHeader("SUCESSO!");
+      display.setTextSize(1);
+      display.setCursor(10, 30);
+      display.print("Reiniciando...");
+      display.display();
+      delay(250);
       ESP.restart();
       break;
   }
@@ -127,13 +159,18 @@ void checarComandoOTA() {
   if (httpCode == 200) {
     String payload = http.getString();
     if (payload.indexOf("\"field4\":\"1\"") != -1) {
+      http.end(); // LIBERA A MEMÓRIA RAM DO HTTP ANTES DE INICIAR O OTA!
+
+      // Reseta a flag field4 para 0 no ThingSpeak
       HTTPClient resetHttp;
       String resetUrl = "https://api.thingspeak.com/update?api_key=" + String(WRITE_API_KEY) + "&field4=0";
       resetHttp.begin(resetUrl);
       resetHttp.GET();
       resetHttp.end();
 
+      delay(1000); // Aguarda estabilização da rede
       executarOTA();
+      return;
     }
   }
   http.end();
@@ -154,17 +191,21 @@ void enviarDadosECheck() {
   int leituraDigital = digitalRead(LDR_PIN);
   luzG = (leituraDigital == LOW) ? 4095 : 0;
 
+  // Leitura do Sensor de Gás no Pino D2
+  gasG = analogRead(GAS_PIN);
+
   HTTPClient http;
   String url = "https://api.thingspeak.com/update?api_key=" + String(WRITE_API_KEY);
   url += "&field1=" + String(t);
   url += "&field2=" + String(h);
   url += "&field3=" + String(luzG);             // Field 3: LDR
   url += "&field5=" + FIRMWARE_VERSION;         // Field 5: Versão Firmware
+  url += "&field6=" + String(gasG);             // Field 6: Sensor de Gás
 
   http.begin(url);
   int httpCode = http.GET();
   if (httpCode == 200) {
-    Serial.printf(" [Data] Temp: %.1f °C | Umid: %.0f %% | LDR: %d | Ver: %s\n", t, h, luzG, FIRMWARE_VERSION.c_str());
+    Serial.printf(" [Data] Temp: %.1f °C | Umid: %.0f %% | LDR: %d | Gas: %d | Ver: %s\n", t, h, luzG, gasG, FIRMWARE_VERSION.c_str());
   }
   http.end();
 
@@ -174,8 +215,9 @@ void enviarDadosECheck() {
 void setup() {
   Serial.begin(115200);
   pinMode(LDR_PIN, INPUT);
+  pinMode(GAS_PIN, INPUT);
 
-  // Reinicializa o barramento I2C e força reinício no endereço 0x3C
+  // Reinicializa o barramento I2C para garantir a tela OLED no D21/D22
   Wire.end();
   Wire.begin(21, 22);
   

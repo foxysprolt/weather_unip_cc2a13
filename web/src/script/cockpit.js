@@ -84,6 +84,13 @@ async function dispararAtualizacao() {
     if (res.ok) {
       statusEl.innerText = `Comando enviado! ESP32 baixando versão ${versaoMaisRecente}...`;
       document.getElementById('btn-ota').disabled = true;
+
+      // ⚠️ AGENDA A LIMPEZA DA FLAG APÓS 16 SEGUNDOS (Respeita a API do ThingSpeak)
+      setTimeout(async () => {
+        const resetUrl = `https://api.thingspeak.com/update?api_key=${WRITE_API_KEY}&field4=0`;
+        await fetch(resetUrl);
+        console.log("🧹 Flag field4 resetada para 0 no ThingSpeak.");
+      }, 16000);
     }
   } catch (err) {
     alert("Erro ao enviar comando de atualização.");

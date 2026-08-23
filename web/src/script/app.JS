@@ -56,6 +56,24 @@ async function carregarDadosClima() {
       body.classList.remove('light-mode');
       if (widget) widget.classList.remove('light-mode');
     }
+    // Gás
+const gasPpm = parseInt(ultimaLeitura.field6) || 0;
+
+const elGas = document.getElementById('dash-gas');
+const elGasMsg = document.getElementById('dash-gas-msg');
+const cardGas = document.getElementById('card-gas');
+
+if (elGas) elGas.innerText = gasPpm;
+
+if (elGasMsg && cardGas) {
+  if (gasPpm > 1500) {
+    elGasMsg.innerText = "⚠️ ALERTA: Fumaça/Gás Detectado!";
+    cardGas.classList.add('alerta-gas');
+  } else {
+    elGasMsg.innerText = "Ar puro e ambiente seguro 🌿";
+    cardGas.classList.remove('alerta-gas');
+  }
+}
 
   } catch (error) {
     console.error("Erro ao carregar dados do ThingSpeak:", error);
