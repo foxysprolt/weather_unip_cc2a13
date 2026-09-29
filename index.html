@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Weather Intelligence - Painel IoT</title>
+  
+  <!-- Fonte Saira do Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Saira:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: "Saira", sans-serif;
+      transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    }
+
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      background: #0f172a;
+      color: #ffffff;
+      padding: 20px;
+    }
+
+    body.light-mode {
+      background-color: #e2e8f0 !important;
+    }
+
+    /* WIDGET CONTAINER */
+    .weather-widget {
+      width: 440px;
+      max-width: 95vw;
+      background: rgba(18, 24, 38, 0.88);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 32px;
+      padding: 35px 30px;
+      box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6),
+                  inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      text-align: center;
+    }
+
+    .weather-widget.light-mode {
+      background: rgba(255, 255, 255, 0.88) !important;
+      border: 1px solid rgba(0, 0, 0, 0.1) !important;
+      color: #1e293b !important;
+      box-shadow: 0 30px 60px rgba(0, 0, 0, 0.15) !important;
+    }
+
+    /* HEADER */
+    .header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 5px;
+    }
+
+    .data-atual {
+      font-size: 11px;
+      letter-spacing: 1.2px;
+      color: #8a99ad;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .btn-admin {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #ffffff;
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .btn-admin:hover {
+      background: #00a8ff;
+      border-color: #00a8ff;
+      box-shadow: 0 0 10px rgba(0, 168, 255, 0.5);
+    }
+
+    .temp-principal {
+      font-size: 4.8em;
+      font-weight: 800;
+      color: #ffffff;
+      line-height: 1.1;
+      margin: 8px 0;
+      text-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    }
+
+    .weather-widget.light-mode .temp-principal,
+    .weather-widget.light-mode .valor-pane {
+      color: #0f172a !important;
+      text-shadow: none !important;
+    }
+
+    .frase-clima {
+      font-size: 15px;
+      color: #38ef7d;
+      font-weight: 600;
+      margin-bottom: 25px;
+    }
+
+    /* ABAS DE NAVEGAÇÃO */
+    .tabs-navigation {
+      display: flex;
+      background: rgba(10, 14, 23, 0.6);
+      border-radius: 16px;
+      padding: 5px;
+      gap: 5px;
+      margin-bottom: 20px;
+    }
+
+    .weather-widget.light-mode .tabs-navigation,
+    .weather-widget.light-mode .card-interior {
+      background: rgba(241, 245, 249, 0.9) !important;
+      border: 1px solid rgba(0, 0, 0, 0.05) !important;
+    }
+
+    .tab-btn {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: #8a99ad;
+      padding: 10px 0;
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .tab-btn.active {
+      background: #00a8ff;
+      color: #ffffff;
+      box-shadow: 0 4px 12px rgba(0, 168, 255, 0.4);
+    }
+
+    /* CONTEÚDO DAS ABAS */
+    .tab-pane {
+      display: none;
+      animation: fadeIn 0.4s ease;
+    }
+
+    .tab-pane.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .sensor-tag {
+      font-size: 11px;
+      letter-spacing: 1px;
+      color: #8a99ad;
+      font-weight: 700;
+    }
+
+    .card-interior {
+      position: relative;
+      height: 130px;
+      background: rgba(10, 14, 23, 0.7);
+      border-radius: 20px;
+      margin: 12px 0 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .valor-pane {
+      font-size: 2.8em;
+      font-weight: 800;
+      color: #ffffff;
+      z-index: 2;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
+    }
+
+    .status-sub {
+      font-size: 13px;
+      color: #38ef7d;
+      font-weight: 600;
+    }
+
+    /* ANIMAÇÃO DE ÁGUA DA UMIDADE */
+    .nivel-agua {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 0%;
+      background: linear-gradient(180deg, rgba(0, 168, 255, 0.7), rgba(9, 132, 227, 0.9));
+      transition: height 1s ease;
+      z-index: 1;
+    }
+
+    .onda {
+      position: absolute;
+      top: -20px;
+      left: 0;
+      width: 200%;
+      height: 25px;
+      animation: mexerOnda 5s linear infinite;
+    }
+
+    .onda2 {
+      top: -14px;
+      opacity: 0.5;
+      animation: mexerOnda 3s linear infinite reverse;
+    }
+
+    @keyframes mexerOnda {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+
+    /* ALERTA DE GÁS */
+    .gas-interior.alerta-gas {
+      background: rgba(235, 77, 75, 0.8) !important;
+      animation: piscar 0.8s infinite alternate;
+    }
+
+    @keyframes piscar {
+      0% { border-color: red; }
+      100% { border-color: white; }
+    }
+
+    /* BEXIGA PRESSÃO */
+    .bexiga-wrapper {
+      position: absolute;
+      z-index: 1;
+      opacity: 0.3;
+    }
+
+    .bexiga {
+      position: relative;
+      width: 40px;
+      height: 50px;
+      background: radial-gradient(circle at 30% 30%, #ff7675, #d63031);
+      border-radius: 50% 50% 50% 50% / 40% 40% 60% 60%;
+    }
+
+    .widget-footer {
+      margin-top: 25px;
+    }
+
+    .btn-replay {
+      width: 100%;
+      padding: 12px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #ffffff;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .btn-replay:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="weather-widget" id="main-widget">
+    <!-- HEADER DO WIDGET -->
+    <div class="widget-header">
+      <div class="header-top">
+        <span class="data-atual" id="dash-data">CARREGANDO DATA...</span>
+        <button class="btn-admin" onclick="abrirPainelOTA()" title="Atualizar ESP32 via OTA">⚙️ OTA</button>
+      </div>
+      
+      <div class="temp-principal">
+        <span id="dash-temp">--</span>°C
+      </div>
+      <p class="frase-clima" id="dash-temp-msg">Analisando atmosfera...</p>
+    </div>
+
+    <!-- NAVEGAÇÃO POR ABAS (TABS) -->
+    <div class="tabs-navigation">
+      <button class="tab-btn active" onclick="trocarAba('umidade', this)">Umidade</button>
+      <button class="tab-btn" onclick="trocarAba('gas', this)">Gás/Fumaça</button>
+      <button class="tab-btn" onclick="trocarAba('pressao', this)">Pressão</button>
+    </div>
+
+    <!-- CONTEÚDO DINÂMICO DAS ABAS -->
+    <div class="tab-content-wrapper">
+      
+      <!-- ABA 1: UMIDADE -->
+      <div class="tab-pane active" id="pane-umidade">
+        <span class="sensor-tag">UMIDADE RELATIVA (DHT11)</span>
+        <div class="card-interior umid-interior">
+          <div class="nivel-agua" id="nivel-agua">
+            <svg class="onda" viewBox="0 0 1200 60" preserveAspectRatio="none">
+              <path d="M0,30 C150,60 300,0 600,30 C900,60 1050,0 1200,30 L1200,60 L0,60 Z" fill="#48dbfb" opacity="0.9"></path>
+            </svg>
+            <svg class="onda onda2" viewBox="0 0 1200 60" preserveAspectRatio="none">
+              <path d="M0,30 C150,60 300,0 600,30 C900,60 1050,0 1200,30 L1200,60 L0,60 Z" fill="#9be8fd"></path>
+            </svg>
+          </div>
+          <div class="valor-pane"><span id="dash-umid">--</span> %</div>
+        </div>
+        <p class="status-sub" id="dash-umid-msg">Nível ideal</p>
+      </div>
+
+      <!-- ABA 2: GÁS / FUMAÇA -->
+      <div class="tab-pane" id="pane-gas">
+        <span class="sensor-tag">QUALIDADE DO AR (MQ-2)</span>
+        <div class="card-interior gas-interior" id="card-gas">
+          <div class="valor-pane"><span id="dash-gas">0</span> ADC</div>
+        </div>
+        <p class="status-sub" id="dash-gas-msg">Ar puro e ambiente seguro 🌿</p>
+      </div>
+
+      <!-- ABA 3: PRESSÃO -->
+      <div class="tab-pane" id="pane-pressao">
+        <span class="sensor-tag">PRESSÃO ATMOSFÉRICA (BMP280)</span>
+        <div class="card-interior pressao-interior">
+          <div class="bexiga-wrapper">
+            <div class="bexiga" id="dash-bexiga"></div>
+          </div>
+          <div class="valor-pane"><span id="dash-pressao">1013</span> hPa</div>
+        </div>
+        <p class="status-sub">Estabilidade barométrica</p>
+      </div>
+
+    </div>
+
+    <!-- RODAPÉ NAVEGAÇÃO -->
+    <div class="widget-footer">
+      <button class="btn-replay" onclick="carregarDadosClima()">🔄 Atualizar Dados Agora</button>
+    </div>
+  </div>
+
+  <script>
+    // --- LÓGICA DE NAVEGAÇÃO POR ABAS ---
+    function trocarAba(nomeAba, elemento) {
+      document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      
+      const abaAlvo = document.getElementById('pane-' + nomeAba);
+      if (abaAlvo) abaAlvo.classList.add('active');
+      if (elemento) elemento.classList.add('active');
+    }
+
+    // --- LÓGICA DA API THINGSPEAK ---
+    const CHANNEL_ID = '3465259';
+    const READ_API_KEY = 'E6VGVV45AMAC0205';
+    const url = `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?results=1&api_key=${READ_API_KEY}`;
+
+    async function carregarDadosClima() {
+      try {
+        const response = await fetch(url);
+        if (!response.ok && response.status !== 304) return;
+
+        const data = await response.json();
+        const feeds = data.feeds;
+        if (!feeds || feeds.length === 0) return;
+
+        const ultimaLeitura = feeds[feeds.length - 1];
+
+        const temp = parseFloat(ultimaLeitura.field1) || 0;
+        const umid = parseFloat(ultimaLeitura.field2) || 0;
+        const luzRaw = parseInt(ultimaLeitura.field3) || 0;
+        const gasPpm = parseInt(ultimaLeitura.field6) || 0;
+        const pressaoVal = parseFloat(ultimaLeitura.field7) || 1013;
+
+        // 1. Data e Hora da Leitura
+        const elData = document.getElementById('dash-data');
+        if (elData && ultimaLeitura.created_at) {
+          const dataObj = new Date(ultimaLeitura.created_at);
+          elData.innerText = `ÚLTIMA LEITURA: ${dataObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
+        }
+
+        // 2. Temperatura
+        const elTemp = document.getElementById('dash-temp');
+        if (elTemp) elTemp.innerText = temp.toFixed(1);
+
+        const elMsgTemp = document.getElementById('dash-temp-msg');
+        if (elMsgTemp) {
+          if (temp >= 30) elMsgTemp.innerText = "Muito Quente! Ambiente abafado.";
+          else if (temp >= 20) elMsgTemp.innerText = "Clima Agradável";
+          else if (temp > 0) elMsgTemp.innerText = "Ambiente Frio";
+          else elMsgTemp.innerText = "Aguardando Leitura...";
+        }
+
+        // 3. Umidade
+        const elUmid = document.getElementById('dash-umid');
+        if (elUmid) elUmid.innerText = Math.round(umid);
+
+        const elAgua = document.getElementById('nivel-agua');
+        if (elAgua) elAgua.style.height = `${Math.min(umid, 100)}%`;
+
+        // 4. Troca do Modo Escuro / Claro pelo LDR
+        const body = document.body;
+        const widget = document.getElementById('main-widget');
+
+        if (luzRaw > 2000) {
+          body.classList.add('light-mode');
+          if (widget) widget.classList.add('light-mode');
+        } else {
+          body.classList.remove('light-mode');
+          if (widget) widget.classList.remove('light-mode');
+        }
+
+        // 5. Gás / Fumaça
+        const elGas = document.getElementById('dash-gas');
+        const elGasMsg = document.getElementById('dash-gas-msg');
+        const cardGas = document.getElementById('card-gas');
+
+        if (elGas) elGas.innerText = gasPpm;
+
+        if (elGasMsg && cardGas) {
+          if (gasPpm > 1500) {
+            elGasMsg.innerText = "⚠️ ALERTA: Fumaça/Gás Detectado!";
+            cardGas.classList.add('alerta-gas');
+          } else {
+            elGasMsg.innerText = "Ar puro e ambiente seguro 🌿";
+            cardGas.classList.remove('alerta-gas');
+          }
+        }
+
+        // 6. Pressão
+        const elPressao = document.getElementById('dash-pressao');
+        if (elPressao) elPressao.innerText = Math.round(pressaoVal);
+
+      } catch (error) {
+        console.error("Erro ao carregar dados do ThingSpeak:", error);
+      }
+    }
+
+    // Atualiza os dados automaticamente a cada 15 segundos
+    setInterval(carregarDadosClima, 15000);
+    
+    // Executa a primeira chamada assim que abre a página
+    carregarDadosClima();
+
+    // Funçao para disparar sinal OTA no ThingSpeak (Field 4)
+    async function abrirPainelOTA() {
+      if (confirm("Deseja enviar o comando de atualização OTA para o ESP32?")) {
+        const urlGatilho = `https://api.thingspeak.com/update?api_key=OGC5WGBQU4OU3GJA&field4=1`;
+        await fetch(urlGatilho);
+        alert("Comando de atualização enviado!");
+      }
+    }
+  </script>
+</body>
+</html>
