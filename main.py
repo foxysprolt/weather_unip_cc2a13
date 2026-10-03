@@ -1,12 +1,12 @@
 import dht
 from machine import ADC, I2C, Pin
 import network
-import weather_unip_cc2a13.ssd1306 as ssd1306
+import ssd1306
 import time
 import urequests
 
 # ==========================================
-# 1. CONFIGURAÇÕES DA REDE E API
+# 1. CONFIGURACOES DA REDE E API
 # ==========================================
 WIFI_SSID = "Ester 2.4G"
 WIFI_PASS = "Ester3600"
@@ -14,7 +14,6 @@ WRITE_API_KEY = "OGC5WGBQU4OU3GJA"
 
 # ==========================================
 # 2. SENSORES LIGADOS NO MOMENTO
-# (Troque para True quando religar na energia)
 # ==========================================
 USAR_TEMPERATURA = True
 USAR_UMIDADE = True
@@ -23,61 +22,89 @@ USAR_GAS = False
 USAR_PRESSAO = False
 
 # ==========================================
-# 3. CONFIGURAÇÃO DOS PINOS E HARDWARE
+# 3. CONFIGURACAO DOS PINOS E HARDWARE
 # ==========================================
-# Sensores
-dht_sensor = dht.DHT11(Pin(4))  # Pino D4
-ldr_sensor = Pin(15, Pin.IN)  # Pino D15
-gas_sensor = ADC(Pin(2))  # Pino D2
+dht_sensor = dht.DHT11(Pin(4))
+ldr_sensor = Pin(15, Pin.IN)
+gas_sensor = ADC(Pin(2))
 gas_sensor.atten(ADC.ATTN_11DB)
 
-# Tela OLED (I2C)
 i2c = I2C(0, scl=Pin(22), sda=Pin(21), freq=400000)
 display = ssd1306.SSD1306_I2C(128, 64, i2c, addr=0x3C)
 
-# Variáveis para guardar as leituras
 temp = 0.0
 umid = 0.0
 luz = 0
 gas = 0
-pressao = 1013.0  # Valor padrao de pressao (hPa)
+pressao = 1013.0
+latitude = 0.0
+longitude = 0.0
+cidade = ""
 
 # ==========================================
 # 4. CONECTAR AO WI-FI
 # ==========================================
 wlan = network.WLAN(network.STA_IF)
+wlan.active(False)
+time.sleep(1)
 wlan.active(True)
+time.sleep(1)
 
 print("Conectando ao Wi-Fi...")
-wlan.connect(WIFI_SSID, WIFI_PASS)
+try:
+    wlan.connect(WIFI_SSID, WIFI_PASS)
+except OSError as e:
+    print("Erro ao iniciar conexao Wi-Fi:", e)
 
 while not wlan.isconnected():
     time.sleep(0.5)
     print(".")
 
-print("Wi-Fi Conectado com sucesso!")
+print("Wi-Fi conectado com sucesso!")
 print("IP obtido:", wlan.ifconfig()[0])
 
 
-# ==========================================
-# 5. FUNÇÃO PARA DESENHAR NA TELA OLED
-# ==========================================
+def buscar_localizacao_ip():
+    global latitude, longitude, cidade
+
+    enderecos = [
+        "https://ipapi.co/json/",
+        "http://ip-api.com/json/?fields=status,city,lat,lon"
+    ]
+
+    for endereco in enderecos:
+        try:
+            resposta = urequests.get(endereco)
+            dados = resposta.json()
+            resposta.close()
+
+            latitude = float(dados.get("latitude", dados.get("lat", 0)))
+            longitude = float(dados.get("longitude", dados.get("lon", 0)))
+            cidade = dados.get("city", "")
+
+            if latitude != 0 and longitude != 0:
+                print("Localizacao aproximada:", cidade)
+                print("Latitude:", latitude, "Longitude:", longitude)
+                return
+        except Exception as e:
+            print("Erro na consulta de localizacao:", e)
+
+    print("Nao foi possivel obter a localizacao pelo IP")
+
+
+buscar_localizacao_ip()
+
+
 def mostrar_na_tela(titulo, valor):
-    display.fill(0)  # Limpa a tela
-    display.rect(0, 0, 128, 64, 1)  # Borda externa
-    display.fill_rect(0, 0, 128, 14, 1)  # Barra do titulo
-    display.text(titulo, 8, 3, 0)  # Titulo em preto
-    display.text(str(valor), 20, 32, 1)  # Valor no meio
+    display.fill(0)
+    display.rect(0, 0, 128, 64, 1)
+    display.fill_rect(0, 0, 128, 14, 1)
+    display.text(titulo, 8, 3, 0)
+    display.text(str(valor), 20, 32, 1)
     display.show()
 
 
-# ==========================================
-# 6. LOOP PRINCIPAL DO PROGRAMA
-# ==========================================
 while True:
-    # --------------------------------------
-    # A) LEITURA DOS SENSORES
-    # --------------------------------------
     if USAR_TEMPERATURA or USAR_UMIDADE:
         try:
             dht_sensor.measure()
@@ -85,8 +112,8 @@ while True:
                 temp = dht_sensor.temperature()
             if USAR_UMIDADE:
                 umid = dht_sensor.humidity()
-        except Exception:
-            print("Erro ao ler o DHT11")
+        except Exception as e:
+            print("Erro ao ler o DHT11:", e)
 
     if USAR_LUZ:
         luz = 4095 if ldr_sensor.value() == 0 else 0
@@ -95,17 +122,14 @@ while True:
         gas = gas_sensor.read()
 
     if USAR_PRESSAO:
-        pressao = 1013.0  # Aqui entra a leitura do BMP280 quando instalado
+        pressao = 1013.0
 
-    # --------------------------------------
-    # B) MOSTRAR NO OLED (Apenas os ATIVOS)
-    # --------------------------------------
     if USAR_TEMPERATURA:
-        mostrar_na_tela("TEMPERATURA", f"{temp:.1f} C")
+        mostrar_na_tela("TEMPERATURA", "{:.1f} C".format(temp))
         time.sleep(3)
 
     if USAR_UMIDADE:
-        mostrar_na_tela("UMIDADE DO AR", f"{int(umid)} %")
+        mostrar_na_tela("UMIDADE DO AR", "{} %".format(int(umid)))
         time.sleep(3)
 
     if USAR_LUZ:
@@ -118,26 +142,25 @@ while True:
         time.sleep(3)
 
     if USAR_PRESSAO:
-        mostrar_na_tela("PRESSAO ATM", f"{int(pressao)} hPa")
+        mostrar_na_tela("PRESSAO ATM", "{} hPa".format(int(pressao)))
         time.sleep(3)
 
-    # --------------------------------------
-    # C) ENVIAR DADOS PARA O THINGSPEAK
-    # --------------------------------------
     print("Enviando dados para o ThingSpeak...")
+    url = "https://api.thingspeak.com/update?api_key={}".format(WRITE_API_KEY)
 
-    url = f"https://api.thingspeak.com/update?api_key={WRITE_API_KEY}"
+    if latitude != 0 and longitude != 0:
+        url += "&lat={}&long={}".format(latitude, longitude)
 
     if USAR_TEMPERATURA:
-        url += f"&field1={temp}"
+        url += "&field1={}".format(temp)
     if USAR_UMIDADE:
-        url += f"&field2={umid}"
+        url += "&field2={}".format(umid)
     if USAR_LUZ:
-        url += f"&field3={luz}"
+        url += "&field3={}".format(luz)
     if USAR_GAS:
-        url += f"&field6={gas}"
+        url += "&field6={}".format(gas)
     if USAR_PRESSAO:
-        url += f"&field7={pressao}"
+        url += "&field7={}".format(pressao)
 
     try:
         resposta = urequests.get(url)
@@ -145,4 +168,3 @@ while True:
         resposta.close()
     except Exception as e:
         print("Erro no envio para a API:", e)
-        

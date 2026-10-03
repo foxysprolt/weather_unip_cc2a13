@@ -281,6 +281,7 @@
         <span class="data-atual" id="dash-data">CARREGANDO DATA...</span>
         <button class="btn-admin" onclick="abrirPainelOTA()" title="Atualizar ESP32 via OTA">⚙️ OTA</button>
       </div>
+      <span class="data-atual" id="dash-localizacao">LOCALIZAÇÃO: CARREGANDO...</span>
       
       <div class="temp-principal">
         <span id="dash-temp">--</span>°C
@@ -370,6 +371,13 @@
         if (!feeds || feeds.length === 0) return;
 
         const ultimaLeitura = feeds[feeds.length - 1];
+
+        const latitude = parseFloat(ultimaLeitura.latitude);
+        const longitude = parseFloat(ultimaLeitura.longitude);
+        const elLocalizacao = document.getElementById('dash-localizacao');
+        if (elLocalizacao && !isNaN(latitude) && !isNaN(longitude) && (latitude !== 0 || longitude !== 0)) {
+          elLocalizacao.innerText = `LOCALIZAÇÃO: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+        }
 
         const temp = parseFloat(ultimaLeitura.field1) || 0;
         const umid = parseFloat(ultimaLeitura.field2) || 0;
