@@ -6,29 +6,26 @@ import time
 import urequests
 
 # ==========================================
-# 1. CONFIGURACOES DA REDE E API
+# ESTACAO METEOROLOGICA - VERSAO PRINCIPAL
 # ==========================================
 WIFI_SSID = "Ester 2.4G"
 WIFI_PASS = "Ester3600"
 WRITE_API_KEY = "OGC5WGBQU4OU3GJA"
 
-# ==========================================
-# 2. SENSORES LIGADOS NO MOMENTO
-# ==========================================
+# Sensores ativos nesta montagem
 USAR_TEMPERATURA = True
 USAR_UMIDADE = True
 USAR_LUZ = True
-USAR_GAS = False
+USAR_GAS = True
 USAR_PRESSAO = False
 
-# ==========================================
-# 3. CONFIGURACAO DOS PINOS E HARDWARE
-# ==========================================
+# Pinos usados
 dht_sensor = dht.DHT11(Pin(4))
 ldr_sensor = Pin(15, Pin.IN)
-gas_sensor = ADC(Pin(2))
+gas_sensor = ADC(Pin(34))
 gas_sensor.atten(ADC.ATTN_11DB)
 
+# OLED e BMP280 podem compartilhar este barramento I2C
 i2c = I2C(0, scl=Pin(22), sda=Pin(21), freq=400000)
 display = ssd1306.SSD1306_I2C(128, 64, i2c, addr=0x3C)
 
@@ -41,27 +38,31 @@ latitude = 0.0
 longitude = 0.0
 cidade = ""
 
-# ==========================================
-# 4. CONECTAR AO WI-FI
-# ==========================================
 wlan = network.WLAN(network.STA_IF)
 wlan.active(False)
 time.sleep(1)
 wlan.active(True)
 time.sleep(1)
 
-print("Conectando ao Wi-Fi...")
-try:
-    wlan.connect(WIFI_SSID, WIFI_PASS)
-except OSError as e:
-    print("Erro ao iniciar conexao Wi-Fi:", e)
 
-while not wlan.isconnected():
-    time.sleep(0.5)
-    print(".")
+def conectar_wifi():
+    if wlan.isconnected():
+        return True
 
-print("Wi-Fi conectado com sucesso!")
-print("IP obtido:", wlan.ifconfig()[0])
+    print("Conectando ao Wi-Fi...")
+    try:
+        wlan.connect(WIFI_SSID, WIFI_PASS)
+    except OSError as e:
+        print("Erro ao iniciar Wi-Fi:", e)
+        return False
+
+    tentativas = 20
+    while not wlan.isconnected() and tentativas > 0:
+        time.sleep(0.5)
+        print(".")
+        tentativas -= 1
+
+    return wlan.isconnected()
 
 
 def buscar_localizacao_ip():
@@ -83,16 +84,26 @@ def buscar_localizacao_ip():
             cidade = dados.get("city", "")
 
             if latitude != 0 and longitude != 0:
-                print("Localizacao aproximada:", cidade)
+                print("Localizacao:", cidade)
                 print("Latitude:", latitude, "Longitude:", longitude)
                 return
         except Exception as e:
-            print("Erro na consulta de localizacao:", e)
+            print("Erro na localizacao:", e)
 
-    print("Nao foi possivel obter a localizacao pelo IP")
+    print("Localizacao por IP indisponivel")
 
 
-buscar_localizacao_ip()
+def ler_dht():
+    # O DHT11 pode falhar ocasionalmente; fazemos ate tres tentativas.
+    for tentativa in range(3):
+        try:
+            dht_sensor.measure()
+            return dht_sensor.temperature(), dht_sensor.humidity()
+        except Exception as e:
+            print("Erro ao ler DHT11, tentativa", tentativa + 1, e)
+            time.sleep(2)
+
+    return 0.0, 0.0
 
 
 def mostrar_na_tela(titulo, valor):
@@ -104,52 +115,12 @@ def mostrar_na_tela(titulo, valor):
     display.show()
 
 
-while True:
-    if USAR_TEMPERATURA or USAR_UMIDADE:
-        try:
-            dht_sensor.measure()
-            if USAR_TEMPERATURA:
-                temp = dht_sensor.temperature()
-            if USAR_UMIDADE:
-                umid = dht_sensor.humidity()
-        except Exception as e:
-            print("Erro ao ler o DHT11:", e)
+def enviar_dados():
+    if not conectar_wifi():
+        print("Dados nao enviados: Wi-Fi sem conexao")
+        return
 
-    if USAR_LUZ:
-        luz = 4095 if ldr_sensor.value() == 0 else 0
-
-    if USAR_GAS:
-        gas = gas_sensor.read()
-
-    if USAR_PRESSAO:
-        pressao = 1013.0
-
-    if USAR_TEMPERATURA:
-        mostrar_na_tela("TEMPERATURA", "{:.1f} C".format(temp))
-        time.sleep(3)
-
-    if USAR_UMIDADE:
-        mostrar_na_tela("UMIDADE DO AR", "{} %".format(int(umid)))
-        time.sleep(3)
-
-    if USAR_LUZ:
-        status_luz = "DIA" if luz > 2000 else "NOITE"
-        mostrar_na_tela("LUMINOSIDADE", status_luz)
-        time.sleep(3)
-
-    if USAR_GAS:
-        mostrar_na_tela("GAS / FUMACA", gas)
-        time.sleep(3)
-
-    if USAR_PRESSAO:
-        mostrar_na_tela("PRESSAO ATM", "{} hPa".format(int(pressao)))
-        time.sleep(3)
-
-    print("Enviando dados para o ThingSpeak...")
     url = "https://api.thingspeak.com/update?api_key={}".format(WRITE_API_KEY)
-
-    if latitude != 0 and longitude != 0:
-        url += "&lat={}&long={}".format(latitude, longitude)
 
     if USAR_TEMPERATURA:
         url += "&field1={}".format(temp)
@@ -161,10 +132,47 @@ while True:
         url += "&field6={}".format(gas)
     if USAR_PRESSAO:
         url += "&field7={}".format(pressao)
+    if latitude != 0 and longitude != 0:
+        url += "&lat={}&long={}".format(latitude, longitude)
 
     try:
         resposta = urequests.get(url)
-        print("Dados enviados! Resposta da API:", resposta.status_code)
+        print("Dados enviados. Resposta da API:", resposta.status_code)
         resposta.close()
     except Exception as e:
-        print("Erro no envio para a API:", e)
+        print("Erro ao enviar dados:", e)
+
+
+if conectar_wifi():
+    buscar_localizacao_ip()
+
+while True:
+    if USAR_TEMPERATURA or USAR_UMIDADE:
+        temp, umid = ler_dht()
+
+    if USAR_LUZ:
+        luz = 4095 if ldr_sensor.value() == 0 else 0
+
+    if USAR_GAS:
+        gas = gas_sensor.read()
+
+    print("Temperatura:", temp)
+    print("Umidade:", umid)
+    print("Luz:", luz)
+    print("Gas:", gas)
+
+    if USAR_TEMPERATURA:
+        mostrar_na_tela("TEMPERATURA", "{:.1f} C".format(temp))
+        time.sleep(2)
+    if USAR_UMIDADE:
+        mostrar_na_tela("UMIDADE", "{} %".format(int(umid)))
+        time.sleep(2)
+    if USAR_LUZ:
+        mostrar_na_tela("LUZ", "DIA" if luz > 2000 else "NOITE")
+        time.sleep(2)
+    if USAR_GAS:
+        mostrar_na_tela("GAS MQ-2", gas)
+        time.sleep(2)
+
+    enviar_dados()
+    time.sleep(16)

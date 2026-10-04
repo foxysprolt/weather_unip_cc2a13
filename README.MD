@@ -54,7 +54,7 @@ Os dados armazenados no **ThingSpeak** podem ser posteriormente consultados por 
    ┌────────────┐          ┌────────────┐          ┌────────────┐
    │   DHT11    │          │    LDR     │          │    MQ-2    │
    │ Temp./Umid.│          │Luminosidade│          │ Gás/Fumaça │
-   │  GPIO 4    │          │  GPIO 15   │          │   GPIO 2   │
+   │  GPIO 4    │          │  GPIO 15   │          │  GPIO 34   │
    └──────┬─────┘          └──────┬─────┘          └──────┬─────┘
           │                       │                        │
           └───────────────────────┼────────────────────────┘
@@ -111,12 +111,12 @@ Web Dashboard
 | Microcontrolador              | ESP32 DevKit v1 — 30 pinos      |    1 | Processamento e conectividade Wi-Fi       |
 | Display Local                 | OLED 0.96" SSD1306 — 128x64 I2C |    1 | Exibição local das métricas               |
 | Sensor de Temperatura/Umidade | DHT11                           |    1 | Medição de temperatura e umidade relativa |
-| Sensor de Luz                 | LDR — módulo digital/analógico  |    1 | Detecção da iluminação ambiente           |
-| Sensor de Gás                 | MQ-2 / MQ-135                   |    1 | Monitoramento de gás e fumaça             |
+| Sensor de Luz                 | LDR — módulo digital            |    1 | Detecção de claro/escuro                  |
+| Sensor de Gás                 | MQ-2                            |    1 | Monitoramento de gás e fumaça             |
 | Sensor de Pressão             | BMP280                          |    1 | Medição da pressão atmosférica            |
 | Fonte de Alimentação          | Cabo Micro-USB 5V               |    1 | Alimentação e comunicação serial          |
 
-> **Observação:** os sensores MQ-2/MQ-135 e BMP280 possuem suporte no código e podem ser ativados conforme a montagem física do projeto.
+> **Estado atual:** DHT11, LDR e MQ-2 estão conectados e sendo lidos pelo ESP32. O OLED também está ativo. O BMP280 permanece previsto, mas ainda não foi ativado no firmware.
 
 ---
 
@@ -128,7 +128,7 @@ Web Dashboard
 | BMP280       | SDA / SCL      | GPIO 21 / GPIO 22 | Digital — I2C   | Compartilha o barramento I2C com o OLED   |
 | DHT11        | DATA / OUT     | GPIO 4            | Digital         | Leitura de temperatura e umidade          |
 | LDR          | DO             | GPIO 15           | Digital         | Retorna LOW quando detecta luz suficiente |
-| MQ-2         | AO             | GPIO 2            | Analógico — ADC | Entrada de 0 V a 3,3 V                    |
+| MQ-2         | AO             | GPIO 34           | Analógico — ADC1| Usa divisor de tensão; funciona com Wi-Fi |
 
 ### Barramento I2C
 
@@ -142,6 +142,8 @@ ESP32
  └── GPIO 22 ── SCL ──┬── OLED SSD1306
                       └── BMP280
 ```
+
+O MQ-2 possui um aquecedor interno e pode consumir mais corrente que os outros sensores. O sinal `AO` deve ser reduzido para até 3,3 V antes de entrar no ESP32. Não coloque 110 V na protoboard.
 
 ---
 
@@ -157,7 +159,7 @@ Os sensores podem ser ativados ou desativados por meio de variáveis booleanas:
 USAR_TEMPERATURA = True
 USAR_UMIDADE     = True
 USAR_LUZ         = True
-USAR_GAS         = False
+USAR_GAS         = True
 USAR_PRESSAO     = False
 ```
 
@@ -199,8 +201,8 @@ O firmware realiza a leitura dos sensores habilitados:
 
 * DHT11 → temperatura e umidade;
 * LDR → luminosidade;
-* MQ-2/MQ-135 → leitura analógica de gás/fumaça;
-* BMP280 → pressão atmosférica.
+* MQ-2 → leitura analógica de gás/fumaça pelo GPIO34;
+* BMP280 → pressão atmosférica (componente previsto, ainda não ativado).
 
 Os sensores opcionais podem permanecer desativados por meio das flags de configuração.
 
@@ -232,6 +234,8 @@ urequests
 
 para realizar a comunicação com a API.
 
+O firmware também tenta obter uma localização aproximada pelo IP público da rede e envia latitude e longitude como metadados do registro do ThingSpeak. Essa localização não é GPS e pode apontar apenas para a cidade ou região da conexão.
+
 ---
 
 ## ☁️ Integração Cloud — ThingSpeak API
@@ -249,6 +253,7 @@ O ESP32 realiza requisições HTTP para atualizar os campos configurados no cana
 | `field3` | Luminosidade           | Valor bruto / estado do LDR |
 | `field6` | Gás / fumaça           | Leitura ADC                 |
 | `field7` | Pressão atmosférica    | hPa                         |
+| `lat` / `long` | Localização aproximada pelo IP | Coordenadas decimais |
 
 ### Fluxo de Dados
 
@@ -470,6 +475,16 @@ Folder: / (root)
 
 Após a publicação, o GitHub Pages fornecerá a URL da aplicação.
 
+### 7. Render e Aiven
+
+Render e Aiven ainda não estão implementados nesta versão do repositório. A arquitetura atual é:
+
+```text
+ESP32 → ThingSpeak → index.html / GitHub Pages
+```
+
+Uma futura versão poderá utilizar uma API no Render e PostgreSQL no Aiven. Para isso ainda serão necessários um backend, uma tabela de leituras, variáveis de ambiente e a alteração do ESP32 e do dashboard para utilizarem essa API.
+
 ---
 
 ## 🔍 Solução de Problemas — Troubleshooting
@@ -548,9 +563,11 @@ Também verifique:
 
 * alimentação do módulo;
 * conexão da saída analógica;
-* GPIO utilizado;
+* GPIO utilizado: o código atual usa o GPIO34;
 * faixa de tensão da saída;
 * configuração do ADC.
+
+O MQ-2 deve receber alimentação adequada e o sinal `AO` deve passar por um divisor de tensão antes de chegar ao ESP32. O GPIO34 foi escolhido por fazer parte do ADC1 e funcionar com o Wi-Fi. O valor exibido é uma leitura bruta de 0 a 4095, não uma medição calibrada em ppm.
 
 ---
 
@@ -640,13 +657,21 @@ A proposta demonstra, na prática, um fluxo completo de **Internet das Coisas (I
 * [x] Leitura de umidade
 * [x] Leitura de luminosidade
 * [x] Suporte a sensor de gás
-* [x] Suporte a sensor de pressão
+* [ ] Leitura real do sensor BMP280
 * [x] Display OLED
 * [x] Conexão Wi-Fi
 * [x] Envio de dados para ThingSpeak
 * [x] Dashboard Web
 * [x] Hospedagem via GitHub Pages
 * [x] Alternância de tema baseada na luminosidade
+
+### Sensores atualmente conectados
+
+* [x] DHT11 no GPIO4
+* [x] LDR no GPIO15
+* [x] MQ-2 no GPIO34
+* [x] OLED SSD1306 no barramento I2C (GPIO21/GPIO22)
+* [ ] BMP280 ainda não conectado/ativado
 
 ---
 
